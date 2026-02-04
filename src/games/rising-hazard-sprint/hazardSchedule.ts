@@ -42,6 +42,8 @@ export type HazardPhase = {
           /** random betrayal: every N ms, arm a few tiles to drop even without stepping */
           betrayalEveryMs?: number;
           betrayalCount?: number;
+          /** prevent repeating the same tile too quickly */
+          betrayalAvoidRepeatMs?: number;
           /** +/- random jitter added to delay (ms) */
           delayJitterMs?: number;
         };
@@ -106,6 +108,7 @@ export const DEFAULT_SCHEDULE: HazardSchedule = {
             dropDelayMs: 650,
             betrayalEveryMs: 1200,
             betrayalCount: 2,
+            betrayalAvoidRepeatMs: 2200,
             delayJitterMs: 450,
           },
         },

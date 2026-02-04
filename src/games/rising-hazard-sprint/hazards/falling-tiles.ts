@@ -14,6 +14,8 @@ export type FallingTilesParams = {
   /** random betrayal: every N ms, arm a few random tiles to drop even without stepping */
   betrayalEveryMs?: number;
   betrayalCount?: number;
+  /** prevent repeating the same tile too quickly */
+  betrayalAvoidRepeatMs?: number;
   /** +/- jitter added to any trigger delay */
   delayJitterMs?: number;
 };
@@ -87,14 +89,32 @@ export function spawnFallingTiles(world: World, params: FallingTilesParams): Haz
   const betrayalCount = params.betrayalCount ?? 0;
 
   if (betrayalEveryMs > 0 && betrayalCount > 0) {
+    const lastBetrayedAt = new Map<number, number>();
+    const avoidRepeatMs = params.betrayalAvoidRepeatMs ?? 2000;
+
     const iv = setInterval(() => {
       if (aliveTiles.length === 0) return;
 
-      for (let i = 0; i < betrayalCount; i++) {
-        if (aliveTiles.length === 0) break;
+      const now = Date.now();
+
+      // Try a few samples to find eligible tiles.
+      const maxAttempts = Math.min(30, aliveTiles.length * 2);
+      let armed = 0;
+      let attempts = 0;
+
+      while (armed < betrayalCount && attempts < maxAttempts && aliveTiles.length > 0) {
+        attempts++;
         const idx = Math.floor(Math.random() * aliveTiles.length);
         const t = aliveTiles[idx];
+        const id = t.id;
+        if (typeof id !== "number") continue;
+
+        const last = lastBetrayedAt.get(id) ?? 0;
+        if (now - last < avoidRepeatMs) continue;
+
+        lastBetrayedAt.set(id, now);
         triggerDrop(t, "betrayal");
+        armed++;
       }
     }, betrayalEveryMs);
 
