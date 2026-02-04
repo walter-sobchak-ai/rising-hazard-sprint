@@ -3,8 +3,9 @@
 2-minute escalating-hazard survival sprint.
 
 ## Goals (MVP)
-- Round loop: LOBBY → COUNTDOWN → RUNNING (120s) → RESULTS
+- Round loop: LOBBY → COUNTDOWN → RUNNING (~90s) → RESULTS
 - Data-driven hazard timeline (v1: rising kill-height)
+- Panic-ramp pacing (fast start, quick retries)
 - Elimination tracking + simple HUD
 
 ## Notes

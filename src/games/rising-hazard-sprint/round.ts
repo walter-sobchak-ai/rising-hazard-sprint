@@ -21,10 +21,10 @@ export type RoundState = {
 export function defaultTimings(config: GameConfig): RoundTimings {
   void config;
   return {
-    lobbyMs: 10_000,
-    countdownMs: 5_000,
-    runningMs: 120_000,
-    resultsMs: 10_000,
+    lobbyMs: 6_000,
+    countdownMs: 3_000,
+    runningMs: 90_000,
+    resultsMs: 8_000,
   };
 }
 

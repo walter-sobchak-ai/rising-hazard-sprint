@@ -28,14 +28,15 @@ export type HazardSchedule = {
  */
 export const DEFAULT_SCHEDULE: HazardSchedule = {
   version: 1,
-  roundDurationMs: 120_000,
+  roundDurationMs: 90_000,
   phases: [
     {
       tMs: 0,
       add: [
         {
           type: "rising_kill_height",
-          params: { startHeight: -5, riseRate: 0.08 },
+          // Panic ramp: starts threatening quickly and accelerates.
+          params: { startHeight: 0, riseRate: 0.22 },
         },
       ],
     },
