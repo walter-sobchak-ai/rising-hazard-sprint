@@ -1,0 +1,8 @@
+node_modules/
+.DS_Store
+.env
+.env.*
+
+# HYTOPIA local dev artifacts
+assets/**/.atlas/
+dev/

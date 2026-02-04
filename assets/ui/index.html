@@ -1,0 +1,179 @@
+<style>
+  /* Root overlay container */
+  .yhg-ui {
+    position: fixed;
+    inset: 0;
+    pointer-events: none; /* enable pointer only on interactive panels */
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    color: #fff;
+  }
+  /* HUD slots */
+  .hud-top-left,
+  .hud-top-right,
+  .hud-bottom-left,
+  .hud-bottom-right {
+    position: absolute;
+    padding: 12px;
+    display: flex;
+    gap: 8px;
+    flex-direction: column;
+  }
+  .hud-top-left {
+    top: 0;
+    left: 0;
+  }
+  .hud-top-right {
+    top: 0;
+    right: 0;
+    align-items: flex-end;
+  }
+  .hud-bottom-left {
+    bottom: 0;
+    left: 0;
+  }
+  .hud-bottom-right {
+    bottom: 0;
+    right: 0;
+    align-items: flex-end;
+  }
+  /* Toasts */
+  .toasts {
+    position: absolute;
+    top: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(520px, 92vw);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    pointer-events: none;
+  }
+  .toast {
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: rgba(20, 20, 20, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .toast .tone {
+    opacity: 0.8;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .toast.info {
+    border-color: rgba(90, 160, 255, 0.35);
+  }
+  .toast.success {
+    border-color: rgba(90, 255, 160, 0.35);
+  }
+  .toast.warning {
+    border-color: rgba(255, 200, 90, 0.35);
+  }
+  .toast.error {
+    border-color: rgba(255, 90, 90, 0.35);
+  }
+  /* Debug overlay */
+  .debug {
+    position: absolute;
+    bottom: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(720px, 96vw);
+    background: rgba(0, 0, 0, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 12px;
+    padding: 10px 12px;
+    pointer-events: auto; /* allow select/copy */
+    display: none;
+  }
+  .debug pre {
+    margin: 0;
+    white-space: pre-wrap;
+    font-size: 12px;
+    line-height: 1.3;
+    opacity: 0.95;
+  }
+  /* Minimal interactive panel example (optional) */
+  .panel {
+    pointer-events: auto;
+  }
+</style>
+
+<div class="yhg-ui">
+  <div class="toasts" id="toasts"></div>
+  <div class="hud-top-left" id="hudTopLeft"></div>
+  <div class="hud-top-right" id="hudTopRight"></div>
+  <div class="hud-bottom-left" id="hudBottomLeft"></div>
+  <div class="hud-bottom-right" id="hudBottomRight"></div>
+  <div class="debug" id="debug">
+    <pre id="debugText">debug: ready</pre>
+  </div>
+</div>
+
+<script>
+  // HYTOPIA injects `hytopia` global for UI messaging.
+  const $toasts = document.getElementById('toasts');
+  const $debug = document.getElementById('debug');
+  const $debugText = document.getElementById('debugText');
+
+  function addToast({ message, tone = 'info', ttlMs = 2200 }) {
+    const el = document.createElement('div');
+    el.className = `toast ${tone}`;
+    el.innerHTML = `<div>${message}</div><div class="tone">${tone}</div>`;
+    $toasts.appendChild(el);
+    setTimeout(() => el.remove(), ttlMs);
+  }
+
+  function setDebugVisible(isVisible) {
+    $debug.style.display = isVisible ? 'block' : 'none';
+  }
+
+  function setDebugText(text) {
+    $debugText.textContent = text;
+  }
+
+  // Server -> UI messages
+  hytopia.onData((data) => {
+    if (!data || typeof data !== 'object') return;
+
+    if (data.type === 'ui.toast') {
+      addToast(data.payload || {});
+      return;
+    }
+
+    if (data.type === 'ui.debug') {
+      setDebugVisible(!!data.payload?.visible);
+      if (typeof data.payload?.text === 'string') setDebugText(data.payload.text);
+      return;
+    }
+
+    if (data.type === 'ui.hud') {
+      // Minimal HUD slot rendering (string-only for v1)
+      const slot = data.payload?.slot;
+      const text = data.payload?.text;
+      if (typeof text !== 'string') return;
+
+      const targetId =
+        slot === 'topLeft'
+          ? 'hudTopLeft'
+          : slot === 'topRight'
+            ? 'hudTopRight'
+            : slot === 'bottomLeft'
+              ? 'hudBottomLeft'
+              : slot === 'bottomRight'
+                ? 'hudBottomRight'
+                : null;
+
+      if (!targetId) return;
+      document.getElementById(targetId).textContent = text;
+      return;
+    }
+  });
+
+  // Example UI -> server (optional)
+  // hytopia.sendData({ type: 'ui.ready' });
+</script>
