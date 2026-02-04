@@ -37,7 +37,13 @@ export type HazardPhase = {
           depth: number;
           tileSize: number;
           gap: number;
+          /** baseline delay after a trigger */
           dropDelayMs: number;
+          /** random betrayal: every N ms, arm a few tiles to drop even without stepping */
+          betrayalEveryMs?: number;
+          betrayalCount?: number;
+          /** +/- random jitter added to delay (ms) */
+          delayJitterMs?: number;
         };
       }
   >;
@@ -98,6 +104,9 @@ export const DEFAULT_SCHEDULE: HazardSchedule = {
             tileSize: 3,
             gap: 0.25,
             dropDelayMs: 650,
+            betrayalEveryMs: 1200,
+            betrayalCount: 2,
+            delayJitterMs: 450,
           },
         },
       ],
