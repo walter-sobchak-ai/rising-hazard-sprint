@@ -9,11 +9,17 @@ type SweeperParams = {
   length: number;
   thickness: number;
   y: number;
-  /** radians per second */
+  /** radians per second (base) */
   angularSpeed: number;
+  /** optional radians/sec^2 */
+  angularAccel?: number;
+  /** optional clamp */
+  angularSpeedMax?: number;
   /** impulse strength applied to players on hit */
   knockback: number;
   lift: number;
+  /** per-target hit cooldown (ms) */
+  hitCooldownMs?: number;
 };
 
 function yawQuat(yawRad: number) {
@@ -43,13 +49,23 @@ export function spawnSweeper(world: World, params: SweeperParams): {
 
   sweeper.spawn(world, { x: params.center.x, y: params.y, z: params.center.z });
 
-  // Collision → knockback
+  // Collision → knockback (with cooldown)
+  const lastHitAt = new Map<number, number>();
+  const hitCooldownMs = params.hitCooldownMs ?? 400;
+
   sweeper.on(EntityEvent.ENTITY_COLLISION, ({ otherEntity, started }) => {
     if (!started) return;
 
-    // Best-effort: DefaultPlayerEntity is an Entity subclass (dynamic) so applyImpulse should work.
     const playerEnt = otherEntity as unknown as HEntity;
     if (playerEnt.tag === "game.controller") return;
+
+    const entId = playerEnt.id;
+    if (typeof entId !== "number") return;
+
+    const now = Date.now();
+    const last = lastHitAt.get(entId) ?? 0;
+    if (now - last < hitCooldownMs) return;
+    lastHitAt.set(entId, now);
 
     const fromCenter = {
       x: playerEnt.position.x - params.center.x,
@@ -70,10 +86,21 @@ export function spawnSweeper(world: World, params: SweeperParams): {
   });
 
   let yaw = 0;
+  let t = 0;
 
   const update = (dtMs: number) => {
     const dt = dtMs / 1000;
-    yaw += params.angularSpeed * dt;
+    t += dt;
+
+    const speed = (() => {
+      const base = params.angularSpeed;
+      const accel = params.angularAccel ?? 0;
+      const s = base + accel * t;
+      const max = params.angularSpeedMax;
+      return typeof max === "number" ? Math.min(max, s) : s;
+    })();
+
+    yaw += speed * dt;
 
     // Keep centered, rotate around Y
     sweeper.setNextKinematicPosition({ x: params.center.x, y: params.y, z: params.center.z });

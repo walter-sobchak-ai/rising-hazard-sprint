@@ -17,10 +17,16 @@ export type HazardPhase = {
           length: number;
           thickness: number;
           y: number;
-          /** radians per second */
+          /** radians per second (base) */
           angularSpeed: number;
+          /** optional radians/sec^2 applied over time during RUNNING */
+          angularAccel?: number;
+          /** optional clamp for angular speed */
+          angularSpeedMax?: number;
           knockback: number;
           lift: number;
+          /** ms cooldown per target to avoid impulse spam */
+          hitCooldownMs?: number;
         };
       }
     | {
@@ -71,8 +77,11 @@ export const DEFAULT_SCHEDULE: HazardSchedule = {
             thickness: 1.2,
             y: 3,
             angularSpeed: 2.6,
+            angularAccel: 0.06,
+            angularSpeedMax: 4.4,
             knockback: 18,
             lift: 6,
+            hitCooldownMs: 450,
           },
         },
       ],
