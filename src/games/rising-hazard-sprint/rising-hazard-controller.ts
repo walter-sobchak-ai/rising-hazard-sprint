@@ -19,6 +19,11 @@ import {
 
 type PlayerId = string;
 
+type RuntimeProfile = {
+  tokens: number;
+  bestSurvivalMs: number;
+};
+
 export class RisingHazardSprintController extends BaseEntityController {
   private config: GameConfig;
   private schedule: HazardSchedule;
@@ -30,6 +35,9 @@ export class RisingHazardSprintController extends BaseEntityController {
   private getPlayerEntity: (playerId: PlayerId) => DefaultPlayerEntity | undefined;
 
   private eliminated = new Set<PlayerId>();
+  private eliminatedAtMs = new Map<PlayerId, number>();
+  private profiles = new Map<PlayerId, RuntimeProfile>();
+
   private spawnPos: { x: number; y: number; z: number };
   private spectatePos: { x: number; y: number; z: number };
 
@@ -108,14 +116,36 @@ export class RisingHazardSprintController extends BaseEntityController {
   private onPhaseChanged(from: RoundState["phase"], to: RoundState["phase"], now: number) {
     // Optional hook point for analytics/live-ops later.
     void from;
-    void now;
 
     if (to === "RUNNING") {
       this.eliminated.clear();
+      this.eliminatedAtMs.clear();
       this.broadcastToast(`Round ${this.state.roundNumber} — GO!`, "success");
     }
 
     if (to === "RESULTS") {
+      const runningStartedAt = this.state.runningStartedAt ?? now;
+      const roundEndAt = now;
+
+      // Award tokens + update best survival
+      for (const p of this.worldPlayers()) {
+        const id = String(p.id);
+        const eliminatedAt = this.eliminatedAtMs.get(id) ?? roundEndAt;
+        const survivalMs = Math.max(0, eliminatedAt - runningStartedAt);
+
+        const prof = this.profiles.get(id) ?? { tokens: 0, bestSurvivalMs: 0 };
+        const tokensEarned = this.calcTokens(survivalMs);
+        const best = Math.max(prof.bestSurvivalMs, survivalMs);
+
+        const next = { tokens: prof.tokens + tokensEarned, bestSurvivalMs: best };
+        this.profiles.set(id, next);
+
+        // Persist (shallow merge)
+        p.setPersistedData({ rhs_tokens: next.tokens, rhs_bestSurvivalMs: next.bestSurvivalMs });
+
+        toast(p, `+${tokensEarned} tokens (survived ${(survivalMs / 1000).toFixed(0)}s)`, "success");
+      }
+
       const survivors = this.worldPlayers()
         .map((p) => String(p.id))
         .filter((id) => !this.eliminated.has(id)).length;
@@ -142,6 +172,10 @@ export class RisingHazardSprintController extends BaseEntityController {
     }
   }
 
+  seedProfile(playerId: string, profile: RuntimeProfile): void {
+    this.profiles.set(playerId, profile);
+  }
+
   /** Called by UI or chat to requeue a player back into the current round. */
   requeuePlayer(player: Player): void {
     const playerId = String(player.id);
@@ -162,6 +196,7 @@ export class RisingHazardSprintController extends BaseEntityController {
     if (this.eliminated.has(playerId)) return;
 
     this.eliminated.add(playerId);
+    this.eliminatedAtMs.set(playerId, Date.now());
 
     // Simple spectate: teleport to a safe platform in the sky.
     ent.setLinearVelocity({ x: 0, y: 0, z: 0 });
@@ -169,6 +204,12 @@ export class RisingHazardSprintController extends BaseEntityController {
     ent.setPosition(this.spectatePos);
 
     toast(player, "ELIMINATED — click Requeue", "error");
+  }
+
+  private calcTokens(survivalMs: number): number {
+    // Simple, addictive progression: you always get something, but living longer matters.
+    const s = Math.max(0, survivalMs) / 1000;
+    return Math.max(1, Math.floor(1 + s / 10));
   }
 
   private renderHud(now: number) {
@@ -195,6 +236,13 @@ export class RisingHazardSprintController extends BaseEntityController {
         player,
         "topLeft",
         `Round ${this.state.roundNumber}\n${phase} (${remainingSec}s)${elim ? "\nELIMINATED" : ""}`
+      );
+
+      const prof = this.profiles.get(playerId) ?? { tokens: 0, bestSurvivalMs: 0 };
+      setHudText(
+        player,
+        "topRight",
+        `Tokens: ${prof.tokens}\nBest: ${(prof.bestSurvivalMs / 1000).toFixed(0)}s`
       );
 
       if (phase === "RUNNING") {

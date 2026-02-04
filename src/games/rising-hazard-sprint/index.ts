@@ -67,6 +67,14 @@ startServer((world) => {
       const playerId = String(player.id);
       worldPlayers.set(playerId, player);
 
+      // Load persisted profile (if available)
+      const data = player.getPersistedData();
+      const tokens = typeof data?.rhs_tokens === "number" ? (data.rhs_tokens as number) : 0;
+      const bestSurvivalMs =
+        typeof data?.rhs_bestSurvivalMs === "number" ? (data.rhs_bestSurvivalMs as number) : 0;
+      // Seed controller cache (so HUD shows immediately)
+      controller.seedProfile(playerId, { tokens, bestSurvivalMs });
+
       // UI
       loadOverlayUi(player);
       bindUiInbound({
