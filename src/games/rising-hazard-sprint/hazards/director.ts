@@ -9,6 +9,8 @@ export type HazardDirector = {
   reset: (world: World, runningStartedAt: number) => void;
   update: (world: World, now: number, dtMs: number) => void;
   disposeAll: () => void;
+  /** 0-based phase index (for HUD/debug) */
+  getPhaseIndex: () => number;
 };
 
 export function createHazardDirector(params: {
@@ -79,5 +81,5 @@ export function createHazardDirector(params: {
     }
   };
 
-  return { reset, update, disposeAll };
+  return { reset, update, disposeAll, getPhaseIndex: () => phaseIndex };
 }

@@ -314,7 +314,12 @@ export class RisingHazardSprintController extends BaseEntityController {
         const runningStartedAt = this.state.runningStartedAt ?? now;
         const elapsedSec = Math.max(0, now - runningStartedAt) / 1000;
         const killY = this.killHeightStart + this.killHeightRiseRate * elapsedSec;
-        setHudText(player, "bottomLeft", `Kill height: ${killY.toFixed(1)}`);
+        const hazardLevel = this.hazardDirector.getPhaseIndex() + 1;
+        setHudText(
+          player,
+          "bottomLeft",
+          `Hazard Lv ${hazardLevel}\nKill height: ${killY.toFixed(1)}`
+        );
       } else {
         setHudText(player, "bottomLeft", "");
       }
