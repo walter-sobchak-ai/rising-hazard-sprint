@@ -62,6 +62,12 @@ startServer((world) => {
   });
   gameController.spawn(world, { x: 0, y: 0, z: 0 });
 
+  // Quick commands (HYTOPIA SDK)
+  world.chatManager.registerCommand("/requeue", (player) => controller.requeuePlayer(player));
+  world.chatManager.registerCommand("/panic", (player) => {
+    toast(player, "Panic ramp enabled (defaults)", "info");
+  });
+
   globalEvents.on(PlayerManagerEvent.PLAYER_CONNECTED, ({ player }) => {
     player.on(PlayerEvent.JOINED_WORLD, ({ world }) => {
       const playerId = String(player.id);
