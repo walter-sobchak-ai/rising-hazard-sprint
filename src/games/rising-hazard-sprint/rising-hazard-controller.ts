@@ -9,6 +9,7 @@ import type { GameConfig } from "../../core/config";
 import { setHudText, toast } from "../../gameplay/ui";
 
 import { DEFAULT_SCHEDULE, type HazardSchedule } from "./hazardSchedule";
+import { createHazardDirector } from "./hazards/director";
 import {
   createRoundState,
   defaultTimings,
@@ -41,9 +42,10 @@ export class RisingHazardSprintController extends BaseEntityController {
   private spawnPos: { x: number; y: number; z: number };
   private spectatePos: { x: number; y: number; z: number };
 
-  // Hazard runtime (v1)
+  // Hazard runtime
   private killHeightStart = -5;
   private killHeightRiseRate = 0.08;
+  private hazardDirector = createHazardDirector({ schedule: DEFAULT_SCHEDULE });
 
   constructor(params: {
     config: GameConfig;
@@ -57,6 +59,7 @@ export class RisingHazardSprintController extends BaseEntityController {
     super();
     this.config = params.config;
     this.schedule = params.schedule ?? DEFAULT_SCHEDULE;
+    this.hazardDirector = createHazardDirector({ schedule: this.schedule });
     this.timings = defaultTimings(params.config);
 
     const now = params.now?.() ?? Date.now();
@@ -81,7 +84,9 @@ export class RisingHazardSprintController extends BaseEntityController {
 
   override spawn(entity: Entity): void {
     super.spawn(entity);
-    // v1: keep template event surface minimal.
+    // Keep reference to the world via the entity once spawned.
+    // (We avoid storing world directly until spawn.)
+    void entity;
   }
 
   override tick(entity: Entity, deltaTimeMs: number): void {
@@ -93,12 +98,13 @@ export class RisingHazardSprintController extends BaseEntityController {
     this.state = nextPhaseIfDue({ state: this.state, now, timings: this.timings });
 
     if (this.state.phase !== prevPhase) {
-      this.onPhaseChanged(prevPhase, this.state.phase, now);
+      this.onPhaseChanged(prevPhase, this.state.phase, now, entity);
     }
 
     // Only apply hazards during RUNNING.
     if (this.state.phase === "RUNNING") {
       this.applyRisingKillHeight(now);
+      if (entity.world) this.hazardDirector.update(entity.world, now, deltaTimeMs);
 
       // If everyone is dead, end early.
       const alive = this.worldPlayers()
@@ -106,24 +112,36 @@ export class RisingHazardSprintController extends BaseEntityController {
         .filter((id) => !this.eliminated.has(id)).length;
       if (alive <= 0 && this.worldPlayers().length > 0) {
         this.state = { ...this.state, phase: "RESULTS", phaseStartedAt: now };
-        this.onPhaseChanged("RUNNING", "RESULTS", now);
+        this.onPhaseChanged("RUNNING", "RESULTS", now, entity);
       }
     }
 
     this.renderHud(now);
   }
 
-  private onPhaseChanged(from: RoundState["phase"], to: RoundState["phase"], now: number) {
+  private onPhaseChanged(
+    from: RoundState["phase"],
+    to: RoundState["phase"],
+    now: number,
+    controllerEntity: Entity
+  ) {
     // Optional hook point for analytics/live-ops later.
     void from;
 
     if (to === "RUNNING") {
       this.eliminated.clear();
       this.eliminatedAtMs.clear();
+
+      // (Re)spawn hazards for this round.
+      this.hazardDirector.reset(controllerEntity.world!, now);
+
       this.broadcastToast(`Round ${this.state.roundNumber} — GO!`, "success");
     }
 
     if (to === "RESULTS") {
+      // Cleanup round hazards.
+      this.hazardDirector.disposeAll();
+
       const runningStartedAt = this.state.runningStartedAt ?? now;
       const roundEndAt = now;
 
