@@ -17,6 +17,8 @@ import { setupPlayerCamera } from "../../gameplay/camera";
 import { loadOverlayUi, toast, bindUiInbound } from "../../gameplay/ui";
 
 import { RisingHazardSprintController } from "./rising-hazard-controller";
+import { buildMvpArena } from "./worldgen";
+import { SPAWN_POS, SPECTATE_POS } from "./constants";
 
 /**
  * Rising Hazard Sprint — runnable entrypoint.
@@ -33,9 +35,20 @@ startServer((world) => {
 
   gameEvents.emitGame("game.booted", { timestamp: Date.now() });
 
+  // In-code arena (no map export required)
+  buildMvpArena(world);
+
   const playerEntities = new Map<string, DefaultPlayerEntity>();
   const worldPlayers = new Map<string, Player>();
   const globalEvents = EventRouter.globalInstance;
+
+  const controller = new RisingHazardSprintController({
+    config,
+    worldPlayers: () => Array.from(worldPlayers.values()),
+    getPlayerEntity: (playerId) => playerEntities.get(playerId),
+    spawnPos: SPAWN_POS,
+    spectatePos: SPECTATE_POS,
+  });
 
   // Game controller entity (ticks every frame)
   const gameController = new Entity({
@@ -45,11 +58,7 @@ startServer((world) => {
     blockTextureUri: "blocks/missing.png",
     blockHalfExtents: { x: 0.5, y: 0.5, z: 0.5 },
     rigidBodyOptions: { type: RigidBodyType.FIXED },
-    controller: new RisingHazardSprintController({
-      config,
-      worldPlayers: () => Array.from(worldPlayers.values()),
-      getPlayerEntity: (playerId) => playerEntities.get(playerId),
-    }),
+    controller,
   });
   gameController.spawn(world, { x: 0, y: 0, z: 0 });
 
@@ -66,6 +75,9 @@ startServer((world) => {
         config,
         onMessage: (msg) => {
           if (msg.type === "ui.ready") toast(player, "UI ready", "success");
+          if (msg.type === "ui.action" && msg.action === "requeue") {
+            controller.requeuePlayer(player);
+          }
         },
       });
 
@@ -76,7 +88,7 @@ startServer((world) => {
         config,
         spawnOptions: {
           name: "Runner",
-          spawn: { x: 0, y: 10, z: 0 },
+          spawn: SPAWN_POS,
         },
       });
 

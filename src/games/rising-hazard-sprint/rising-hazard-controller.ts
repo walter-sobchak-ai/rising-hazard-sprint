@@ -30,6 +30,8 @@ export class RisingHazardSprintController extends BaseEntityController {
   private getPlayerEntity: (playerId: PlayerId) => DefaultPlayerEntity | undefined;
 
   private eliminated = new Set<PlayerId>();
+  private spawnPos: { x: number; y: number; z: number };
+  private spectatePos: { x: number; y: number; z: number };
 
   // Hazard runtime (v1)
   private killHeightStart = -5;
@@ -40,6 +42,8 @@ export class RisingHazardSprintController extends BaseEntityController {
     schedule?: HazardSchedule;
     worldPlayers: () => Player[];
     getPlayerEntity: (playerId: PlayerId) => DefaultPlayerEntity | undefined;
+    spawnPos: { x: number; y: number; z: number };
+    spectatePos: { x: number; y: number; z: number };
     now?: () => number;
   }) {
     super();
@@ -52,6 +56,8 @@ export class RisingHazardSprintController extends BaseEntityController {
 
     this.worldPlayers = params.worldPlayers;
     this.getPlayerEntity = params.getPlayerEntity;
+    this.spawnPos = params.spawnPos;
+    this.spectatePos = params.spectatePos;
 
     // Prime hazards based on schedule (v1: single rising kill-height)
     const first = this.schedule.phases
@@ -85,6 +91,15 @@ export class RisingHazardSprintController extends BaseEntityController {
     // Only apply hazards during RUNNING.
     if (this.state.phase === "RUNNING") {
       this.applyRisingKillHeight(now);
+
+      // If everyone is dead, end early.
+      const alive = this.worldPlayers()
+        .map((p) => String(p.id))
+        .filter((id) => !this.eliminated.has(id)).length;
+      if (alive <= 0 && this.worldPlayers().length > 0) {
+        this.state = { ...this.state, phase: "RESULTS", phaseStartedAt: now };
+        this.onPhaseChanged("RUNNING", "RESULTS", now);
+      }
     }
 
     this.renderHud(now);
@@ -122,11 +137,38 @@ export class RisingHazardSprintController extends BaseEntityController {
 
       const pos = ent.position;
       if (pos.y < killY) {
-        this.eliminated.add(playerId);
-        toast(player, "ELIMINATED — spectate next (stub)", "error");
-        // v1: no spectate implementation; we just mark eliminated.
+        this.eliminatePlayer(player, ent);
       }
     }
+  }
+
+  /** Called by UI or chat to requeue a player back into the current round. */
+  requeuePlayer(player: Player): void {
+    const playerId = String(player.id);
+    this.eliminated.delete(playerId);
+
+    const ent = this.getPlayerEntity(playerId);
+    if (ent) {
+      ent.setLinearVelocity({ x: 0, y: 0, z: 0 });
+      ent.setAngularVelocity({ x: 0, y: 0, z: 0 });
+      ent.setPosition(this.spawnPos);
+    }
+
+    toast(player, "Requeued", "success");
+  }
+
+  private eliminatePlayer(player: Player, ent: DefaultPlayerEntity): void {
+    const playerId = String(player.id);
+    if (this.eliminated.has(playerId)) return;
+
+    this.eliminated.add(playerId);
+
+    // Simple spectate: teleport to a safe platform in the sky.
+    ent.setLinearVelocity({ x: 0, y: 0, z: 0 });
+    ent.setAngularVelocity({ x: 0, y: 0, z: 0 });
+    ent.setPosition(this.spectatePos);
+
+    toast(player, "ELIMINATED — click Requeue", "error");
   }
 
   private renderHud(now: number) {
