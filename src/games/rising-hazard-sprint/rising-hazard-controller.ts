@@ -25,6 +25,13 @@ type RuntimeProfile = {
   bestSurvivalMs: number;
 };
 
+type WeeklyRuntime = {
+  weekKey: string;
+  playCount: number;
+  surviveBestSec: number;
+  finishedOnce: boolean;
+};
+
 export class RisingHazardSprintController extends BaseEntityController {
   private config: GameConfig;
   private schedule: HazardSchedule;
@@ -38,6 +45,7 @@ export class RisingHazardSprintController extends BaseEntityController {
   private eliminated = new Set<PlayerId>();
   private eliminatedAtMs = new Map<PlayerId, number>();
   private profiles = new Map<PlayerId, RuntimeProfile>();
+  private weekly = new Map<PlayerId, WeeklyRuntime>();
 
   private spawnPos: { x: number; y: number; z: number };
   private spectatePos: { x: number; y: number; z: number };
@@ -145,11 +153,12 @@ export class RisingHazardSprintController extends BaseEntityController {
       const runningStartedAt = this.state.runningStartedAt ?? now;
       const roundEndAt = now;
 
-      // Award tokens + update best survival
+      // Award tokens + update best survival + weekly progress
       for (const p of this.worldPlayers()) {
         const id = String(p.id);
         const eliminatedAt = this.eliminatedAtMs.get(id) ?? roundEndAt;
         const survivalMs = Math.max(0, eliminatedAt - runningStartedAt);
+        const survivalSec = Math.floor(survivalMs / 1000);
 
         const prof = this.profiles.get(id) ?? { tokens: 0, bestSurvivalMs: 0 };
         const tokensEarned = this.calcTokens(survivalMs);
@@ -158,10 +167,33 @@ export class RisingHazardSprintController extends BaseEntityController {
         const next = { tokens: prof.tokens + tokensEarned, bestSurvivalMs: best };
         this.profiles.set(id, next);
 
-        // Persist (shallow merge)
-        p.setPersistedData({ rhs_tokens: next.tokens, rhs_bestSurvivalMs: next.bestSurvivalMs });
+        const wk = this.weekly.get(id);
+        const nextWeekly: WeeklyRuntime | undefined = wk
+          ? {
+              ...wk,
+              playCount: wk.playCount + 1,
+              surviveBestSec: Math.max(wk.surviveBestSec, survivalSec),
+              finishedOnce: wk.finishedOnce || survivalSec >= 10,
+            }
+          : undefined;
 
-        toast(p, `+${tokensEarned} tokens (survived ${(survivalMs / 1000).toFixed(0)}s)`, "success");
+        if (nextWeekly) this.weekly.set(id, nextWeekly);
+
+        // Persist (shallow merge)
+        p.setPersistedData({
+          rhs_tokens: next.tokens,
+          rhs_bestSurvivalMs: next.bestSurvivalMs,
+          ...(nextWeekly
+            ? {
+                rhs_weekKey: nextWeekly.weekKey,
+                rhs_week_playCount: nextWeekly.playCount,
+                rhs_week_surviveBest: nextWeekly.surviveBestSec,
+                rhs_week_finishedOnce: nextWeekly.finishedOnce,
+              }
+            : {}),
+        });
+
+        toast(p, `+${tokensEarned} tokens (survived ${survivalSec}s)`, "success");
       }
 
       const survivors = this.worldPlayers()
@@ -192,6 +224,10 @@ export class RisingHazardSprintController extends BaseEntityController {
 
   seedProfile(playerId: string, profile: RuntimeProfile): void {
     this.profiles.set(playerId, profile);
+  }
+
+  seedWeekly(playerId: string, weekly: WeeklyRuntime): void {
+    this.weekly.set(playerId, weekly);
   }
 
   /** Called by UI or chat to requeue a player back into the current round. */
@@ -262,6 +298,17 @@ export class RisingHazardSprintController extends BaseEntityController {
         "topRight",
         `Tokens: ${prof.tokens}\nBest: ${(prof.bestSurvivalMs / 1000).toFixed(0)}s`
       );
+
+      const wk = this.weekly.get(playerId);
+      if (wk) {
+        setHudText(
+          player,
+          "bottomRight",
+          `WEEKLY (${wk.weekKey})\n• Play: ${wk.playCount}/20\n• Best survive: ${wk.surviveBestSec}s/60s\n• Finish once: ${wk.finishedOnce ? "✓" : "–"}`
+        );
+      } else {
+        setHudText(player, "bottomRight", "");
+      }
 
       if (phase === "RUNNING") {
         const runningStartedAt = this.state.runningStartedAt ?? now;

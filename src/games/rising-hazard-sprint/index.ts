@@ -19,6 +19,7 @@ import { loadOverlayUi, toast, bindUiInbound } from "../../gameplay/ui";
 import { RisingHazardSprintController } from "./rising-hazard-controller";
 import { buildMvpArena } from "./worldgen";
 import { SPAWN_POS, SPECTATE_POS } from "./constants";
+import { parseWeekly, currentWeekKey } from "./weekly";
 
 /**
  * Rising Hazard Sprint — runnable entrypoint.
@@ -78,8 +79,16 @@ startServer((world) => {
       const tokens = typeof data?.rhs_tokens === "number" ? (data.rhs_tokens as number) : 0;
       const bestSurvivalMs =
         typeof data?.rhs_bestSurvivalMs === "number" ? (data.rhs_bestSurvivalMs as number) : 0;
-      // Seed controller cache (so HUD shows immediately)
       controller.seedProfile(playerId, { tokens, bestSurvivalMs });
+
+      // Weekly progress (reset automatically by weekKey)
+      const weekly = parseWeekly(data);
+      controller.seedWeekly(playerId, {
+        weekKey: weekly.weekKey ?? currentWeekKey(),
+        playCount: weekly.playCount,
+        surviveBestSec: weekly.surviveSecondsBest,
+        finishedOnce: weekly.finishedOnce,
+      });
 
       // UI
       loadOverlayUi(player);

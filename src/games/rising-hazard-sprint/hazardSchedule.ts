@@ -102,5 +102,25 @@ export const DEFAULT_SCHEDULE: HazardSchedule = {
         },
       ],
     },
+    {
+      tMs: 35_000,
+      add: [
+        {
+          type: "sweeper",
+          params: {
+            center: { x: 0, y: 0, z: 0 },
+            length: 18,
+            thickness: 1.2,
+            y: 6,
+            angularSpeed: 3.8,
+            angularAccel: 0.1,
+            angularSpeedMax: 6.2,
+            knockback: 24,
+            lift: 8,
+            hitCooldownMs: 350,
+          },
+        },
+      ],
+    },
   ],
 };

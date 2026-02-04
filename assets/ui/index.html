@@ -129,8 +129,9 @@
   <div class="hud-top-right" id="hudTopRight"></div>
   <div class="hud-bottom-left" id="hudBottomLeft"></div>
   <div class="hud-bottom-right" id="hudBottomRight">
-    <div class="panel">
+    <div class="panel" style="display:flex; gap:10px; align-items:center;">
       <button class="btn" id="btnRequeue">Requeue</button>
+      <div id="hudBottomRightText" style="white-space:pre; font-size:12px; opacity:0.92;"></div>
     </div>
   </div>
   <div class="debug" id="debug">
@@ -193,6 +194,13 @@
                 : null;
 
       if (!targetId) return;
+
+      // Preserve the control panel in bottomRight by writing into a sub-node.
+      if (targetId === 'hudBottomRight' && document.getElementById('hudBottomRightText')) {
+        document.getElementById('hudBottomRightText').textContent = text;
+        return;
+      }
+
       document.getElementById(targetId).textContent = text;
       return;
     }
