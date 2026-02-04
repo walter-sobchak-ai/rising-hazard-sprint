@@ -46,7 +46,7 @@ export function spawnFallingTiles(world: World, params: FallingTilesParams): Haz
         const idx = aliveTiles.indexOf(t);
         if (idx >= 0) aliveTiles.splice(idx, 1);
 
-        t.despawn();
+        if (t.isSpawned) t.despawn();
       } catch {
         // ignore
       }
@@ -128,7 +128,7 @@ export function spawnFallingTiles(world: World, params: FallingTilesParams): Haz
       for (const to of timeouts) clearTimeout(to);
       for (const t of tiles) {
         try {
-          t.despawn();
+          if (t.isSpawned) t.despawn();
         } catch {
           // ignore
         }
